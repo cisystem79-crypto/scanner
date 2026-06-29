@@ -145,28 +145,25 @@
     function showApp(){ document.getElementById('loginScreen').style.display='none'; document.getElementById('appScreen').style.display='block'; updateUI(); }
     function logout(){ if(confirm('로그아웃 하시겠습니까?')){ stopScan(); sessionStorage.removeItem('login'); document.getElementById('loginScreen').style.display='flex'; document.getElementById('appScreen').style.display='none'; document.getElementById('loginId').value=''; document.getElementById('loginPw').value=''; } }
 
-    /* ── 스캔 (Web Barcode Detection API) ── */
-    let scanning = false, activeStream = null, scanTimer = null;
-    let lastVal = '', lastTs = 0;
+    /* ── 스캔 (Web Barcode Detection API + 3회 연속 검증) ── */
+    let scanning = false, activeStream = null;
     let barcodeDetector = null;
+    let lastScannedText = '', matchCount = 0;
 
     document.getElementById('scanBtn').addEventListener('click', ()=> scanning ? stopScan() : startScan());
 
     async function startScan(){
         setScanStatus('카메라 시작 중...', false);
 
-        // BarcodeDetector 지원 여부 확인
         if(!('BarcodeDetector' in window)){
             showMsg('❌ 이 브라우저는 바코드 감지를 지원하지 않습니다. 크롬 최신버전을 사용해 주세요.','error');
             return;
         }
 
         try {
-            // 지원 포맷 자동 감지해서 detector 생성
             const supported = await BarcodeDetector.getSupportedFormats();
             barcodeDetector = new BarcodeDetector({ formats: supported });
 
-            // 고해상도 후면 카메라
             activeStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment', width:{ideal:1920}, height:{ideal:1080} }
             });
@@ -182,8 +179,8 @@
             document.getElementById('scanText').textContent = '스캔 중단';
             setScanStatus('바코드를 프레임 안에 맞춰 주세요', false);
 
-            // 200ms 간격으로 반복 감지
-            scanLoop(video);
+            lastScannedText = ''; matchCount = 0;
+            requestAnimationFrame(scanFrame);
 
         } catch(e){
             const msg = e.name==='NotAllowedError' ? '❌ 카메라 권한이 거부됐습니다.' : '❌ 카메라 오류: '+(e.message||e);
@@ -191,31 +188,43 @@
         }
     }
 
-    async function scanLoop(video){
+    async function scanFrame(){
         if(!scanning) return;
-        try {
-            if(video.readyState >= 2){
+        const video = document.getElementById('video');
+        if(video.readyState === video.HAVE_CURRENT_DATA || video.readyState === video.HAVE_ENOUGH_DATA){
+            try {
                 const barcodes = await barcodeDetector.detect(video);
                 if(barcodes.length > 0){
-                    const now = Date.now();
-                    const val = barcodes[0].rawValue.trim().toUpperCase().replace(/^\*|\*$/g,'');
-                    if(val && (val !== lastVal || now - lastTs > 2500)){
-                        lastVal = val; lastTs = now;
+                    const currentText = barcodes[0].rawValue.trim();
+                    if(currentText === lastScannedText){
+                        matchCount++;
+                    } else {
+                        lastScannedText = currentText;
+                        matchCount = 1;
+                    }
+                    // 3회 연속 일치시 확정
+                    if(matchCount >= 3){
+                        const val = currentText.toUpperCase().replace(/^\*|\*$/g,'');
+                        matchCount = 0; lastScannedText = '';
                         document.getElementById('serialInput').value = val;
                         setScanStatus('✅ 인식 성공: '+val, true);
                         if(navigator.vibrate) navigator.vibrate([60,30,60]);
                         checkAndSave(true);
                         setTimeout(()=>{ if(scanning) setScanStatus('바코드를 프레임 안에 맞춰 주세요',false); },2000);
+                        requestAnimationFrame(scanFrame);
+                        return;
                     }
+                } else {
+                    matchCount = 0;
                 }
-            }
-        } catch(e){ console.error(e); }
-        scanTimer = setTimeout(()=>scanLoop(video), 200);
+            } catch(e){ console.error('스캔 중 에러:', e); }
+        }
+        requestAnimationFrame(scanFrame);
     }
 
     function stopScan(){
         scanning = false;
-        if(scanTimer){ clearTimeout(scanTimer); scanTimer=null; }
+        lastScannedText = ''; matchCount = 0;
         try{ if(activeStream) activeStream.getTracks().forEach(t=>t.stop()); } catch(e){}
         activeStream = null;
         const v=document.getElementById('video'); v.srcObject=null;
