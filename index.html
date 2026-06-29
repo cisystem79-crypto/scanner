@@ -184,12 +184,21 @@
     async function startScanner() {
         setScanStatus('카메라 시작 중...', false);
         try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const cams = devices.filter(d => d.kind === 'videoinput');
-            const backCam = cams.find(d => /back|rear|environment/i.test(d.label)) || cams[cams.length - 1];
-            const videoElement = document.getElementById('video');
+            // HD 해상도로 후면 카메라 직접 열기
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
 
-            await reader.decodeContinuously(backCam?.deviceId, videoElement, (result, err) => {
+            const videoElement = document.getElementById('video');
+            videoElement.srcObject = stream;
+            await videoElement.play();
+
+            // 스트림에서 직접 디코딩
+            await reader.decodeFromStream(stream, videoElement, (result, err) => {
                 if (result) {
                     const now = Date.now();
                     const val = result.getText().trim().toUpperCase().replace(/^\*|\*$/g, '');
@@ -233,6 +242,7 @@
             scanning = false;
             try { reader.reset(); } catch(e) {}
             const vid = document.getElementById('video');
+            try { vid.pause(); } catch(e) {}
             try { if (vid.srcObject) { vid.srcObject.getTracks().forEach(t => t.stop()); vid.srcObject = null; } } catch(e) {}
             section.classList.remove('show');
             document.getElementById('scanBtn').classList.remove('active');
