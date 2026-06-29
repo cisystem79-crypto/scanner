@@ -40,14 +40,14 @@
         .bulk-title { font-size:14px; font-weight:bold; color:#5f6368; margin-bottom:8px; }
         .list-header { margin-top:24px; border-bottom:2px solid #f1f3f4; padding-bottom:8px; }
         h3 { margin:0; font-size:16px; color:#5f6368; }
-        ul { list-style:none; padding:0; margin:8px 0 0 0; max-height:280px; overflow-y:auto; border:1px solid #f1f3f4; border-radius:10px; }
-        li { padding:12px 14px; border-bottom:1px solid #f1f3f4; font-size:15px; display:flex; justify-content:space-between; align-items:center; background:#fff; }
-        .serial-text { font-family:monospace; font-size:16px; font-weight:600; color:#202124; flex:1; }
+        ul { list-style:none; padding:0; margin:8px 0 0 0; max-height:400px; overflow-y:auto; border:1px solid #f1f3f4; border-radius:10px; }
+        li { padding:6px 10px; border-bottom:1px solid #f1f3f4; font-size:13px; display:flex; justify-content:space-between; align-items:center; background:#fff; }
+        .serial-text { font-family:monospace; font-size:13px; font-weight:600; color:#202124; flex:1; }
         .used .serial-text { text-decoration:line-through; color:#9aa0a6; }
         .action-btns { display:flex; gap:6px; }
-        .check-btn { background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; padding:6px 10px; font-size:13px; border-radius:6px; cursor:pointer; }
-        .used .check-btn { background:#e6f4ea; color:#137333; border-color:#ceead6; }
-        .delete-btn { background:none; color:#ea4335; border:none; padding:6px 8px; font-size:13px; cursor:pointer; }
+        .check-btn { background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; padding:3px 7px; font-size:11px; border-radius:6px; cursor:pointer; }
+        .used .check-btn { background:#e6f4ea; color:#137333; border-color:#ceead6; padding:3px 7px; font-size:11px; }
+        .delete-btn { background:none; color:#ea4335; border:none; padding:3px 6px; font-size:11px; cursor:pointer; }
         .msg { padding:12px; border-radius:8px; font-size:14px; margin-bottom:16px; display:none; text-align:center; }
         .success { background:#e6f4ea; color:#137333; display:block; }
         .error { background:#fce8e6; color:#c5221f; display:block; }
@@ -122,7 +122,14 @@
     </div>
 
     <div id="messageBox" class="msg"></div>
-    <div class="list-header"><h3>📋 등록된 시리얼 목록</h3></div>
+    <div class="list-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <h3>📋 등록된 시리얼 목록</h3>
+        <div style="display:flex;gap:6px;">
+            <button onclick="sortList('asc')" style="font-size:12px;padding:4px 8px;border:1px solid #dadce0;border-radius:6px;background:#fff;cursor:pointer;">A→Z</button>
+            <button onclick="sortList('desc')" style="font-size:12px;padding:4px 8px;border:1px solid #dadce0;border-radius:6px;background:#fff;cursor:pointer;">Z→A</button>
+            <button onclick="sortList('newest')" style="font-size:12px;padding:4px 8px;border:1px solid #dadce0;border-radius:6px;background:#fff;cursor:pointer;">최신순</button>
+        </div>
+    </div>
     <ul id="serialList"></ul>
     <button class="btn btn-success" id="backupBtn">📊 엑셀(CSV) 파일로 백업받기</button>
 </div>
@@ -247,7 +254,11 @@
         document.getElementById('totalCount').innerText=`등록된 프린터: ${serialList.length}대 (사용 완료: ${used}대)`;
         el.innerHTML='';
         if(!serialList.length){ el.innerHTML='<li style="justify-content:center;color:#9aa0a6;font-size:14px;">등록된 데이터가 없습니다.</li>'; return; }
-        [...serialList].reverse().forEach(item=>{
+        let sorted = [...serialList];
+        if(sortMode==='asc') sorted.sort((a,b)=>a.serial.localeCompare(b.serial));
+        else if(sortMode==='desc') sorted.sort((a,b)=>b.serial.localeCompare(a.serial));
+        else sorted.reverse(); // newest
+        sorted.forEach(item=>{
             const idx=serialList.indexOf(item);
             const li=document.createElement('li');
             if(item.used) li.className='used';
@@ -267,6 +278,7 @@
         if(serialList.some(i=>i.serial===val)){
             showMsg(`❌ [중복] 이미 등록된 번호입니다! (${val})`,'error');
             if(navigator.vibrate) navigator.vibrate([200,100,200]);
+            document.getElementById('serialInput').value='';
         }
         else{ serialList.push({serial:val,used:false}); save(); showMsg(`✅ [완료] '${val}' 등록되었습니다.`,'success'); input.value=''; updateUI(); }
     }
@@ -280,6 +292,11 @@
         showMsg(`📊 신규: ${added}건 / 중복 제외: ${dup}건`,'success');
     }
 
+    let sortMode = 'newest';
+    function sortList(mode){
+        sortMode = mode;
+        updateUI();
+    }
     function save(){ try{ localStorage.setItem('printer_serials_v2',JSON.stringify(serialList)); }catch(e){} }
     function toggleUsed(i){ serialList[i].used=!serialList[i].used; save(); updateUI(); }
     function deleteSerial(i){ if(confirm('삭제하시겠습니까?')){ serialList.splice(i,1); save(); updateUI(); } }
