@@ -207,9 +207,10 @@
     async function startScan() {
         setScanStatus('카메라 시작 중...', false);
         try {
-            // BarcodeDetector API (크롬 안드로이드 지원)
+            // BarcodeDetector API - 지원 형식 자동 감지
             if ('BarcodeDetector' in window) {
-                detector = new BarcodeDetector({ formats: ['code_39', 'code_128', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'data_matrix', 'codabar', 'itf'] });
+                const supported = await BarcodeDetector.getSupportedFormats();
+                detector = new BarcodeDetector({ formats: supported });
             }
 
             stream = await navigator.mediaDevices.getUserMedia({
@@ -228,6 +229,9 @@
             setScanStatus('바코드를 프레임 안에 맞춰 주세요', false);
 
             if (detector) {
+                const supported = await BarcodeDetector.getSupportedFormats();
+                setScanStatus('준비완료 | 지원형식: ' + supported.join(', '), false);
+                setTimeout(() => { if(scanning) setScanStatus('바코드를 프레임 안에 맞춰 주세요', false); }, 4000);
                 scanLoop();
             } else {
                 setScanStatus('❌ 이 브라우저는 바코드 인식을 지원하지 않습니다. 크롬을 사용해 주세요.', false);
