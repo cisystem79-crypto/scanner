@@ -168,75 +168,79 @@
     }
 
     /* ── 스캔 ── */
-    let scanning = false, codeReader = null;
+    let scanning = false;
     let lastVal = '', lastTs = 0;
 
-    document.getElementById('scanBtn').addEventListener('click', () => scanning ? stopScan() : startScan());
+    // 1. 디코딩 힌트 설정
+    const hints = new Map();
+    const formats = [ZXing.BarcodeFormat.CODE_39];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 
-    async function startScan() {
+    // 2. 힌트 주입하여 리더기 초기화
+    const reader = new ZXing.BrowserMultiFormatReader(hints);
+
+    // 3. 후면 카메라 + 고해상도로 스캔 시작
+    async function startScanner() {
         setScanStatus('카메라 시작 중...', false);
         try {
-            const ZXing = window.ZXing;
-            if (!ZXing) { showMsg('❌ 라이브러리 로딩 실패. 페이지를 새로고침 해주세요.', 'error'); return; }
-
-            // Code 39 최적화: 포맷 지정 + TRY_HARDER
-            const hints = new Map();
-            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.CODE_39]);
-            hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-
-            codeReader = new ZXing.BrowserMultiFormatReader(hints);
-
-            // 후면 카메라 찾기
             const devices = await navigator.mediaDevices.enumerateDevices();
             const cams = devices.filter(d => d.kind === 'videoinput');
-            const back = cams.find(d => /back|rear|environment/i.test(d.label)) || cams[cams.length - 1];
+            const backCam = cams.find(d => /back|rear|environment/i.test(d.label)) || cams[cams.length - 1];
+            const videoElement = document.getElementById('video');
 
-            const video = document.getElementById('video');
-            await codeReader.decodeFromVideoDevice(back?.deviceId, video, (result, err) => {
-                if (result) onDetected(result.getText());
-                if (err && !(err instanceof ZXing.NotFoundException)) console.error(err);
+            await reader.decodeContinuously(backCam?.deviceId, videoElement, (result, err) => {
+                if (result) {
+                    const now = Date.now();
+                    const val = result.getText().trim().toUpperCase().replace(/^\*|\*$/g, '');
+                    if (!val || (val === lastVal && now - lastTs < 2500)) return;
+                    lastVal = val; lastTs = now;
+
+                    document.getElementById('serialInput').value = val;
+                    setScanStatus('✅ 인식 성공: ' + val, true);
+                    if (navigator.vibrate) navigator.vibrate([60, 30, 60]);
+                    checkAndSave(true);
+                    setTimeout(() => { if (scanning) setScanStatus('바코드를 프레임 안에 맞춰 주세요', false); }, 2000);
+                }
+                if (err && !(err instanceof ZXing.NotFoundException)) console.error('스캔 에러:', err);
             });
-
-            document.getElementById('scannerSection').classList.add('show');
-            scanning = true;
-            document.getElementById('scanBtn').classList.add('active');
-            document.getElementById('scanBtnIcon').textContent = '⏹';
-            document.getElementById('scanBtnText').textContent = '스캔 중단';
-            setScanStatus('바코드를 프레임 안에 맞춰 주세요', false);
 
         } catch(e) {
             const msg = e.name === 'NotAllowedError'
                 ? '❌ 카메라 권한이 거부됐습니다.'
-                : '❌ 오류: ' + (e.message || e);
+                : '❌ 카메라 오류: ' + (e.message || e);
             showMsg(msg, 'error');
             setScanStatus('오류 발생', false);
+            scanning = false;
+            document.getElementById('scanBtn').classList.remove('active');
+            document.getElementById('scanBtnIcon').textContent = '📷';
+            document.getElementById('scanBtnText').textContent = '카메라로 바코드 스캔';
         }
     }
 
-    function onDetected(raw) {
-        const now = Date.now();
-        const val = raw.trim().toUpperCase().replace(/^\*|\*$/g, '');
-        if (!val || (val === lastVal && now - lastTs < 2500)) return;
-        lastVal = val; lastTs = now;
-        document.getElementById('serialInput').value = val;
-        setScanStatus('✅ 스캔 완료: ' + val, true);
-        if (navigator.vibrate) navigator.vibrate([60, 30, 60]);
-        checkAndSave(true);
-        setTimeout(() => { if (scanning) setScanStatus('바코드를 프레임 안에 맞춰 주세요', false); }, 2000);
-    }
-
-    function stopScan() {
-        try { codeReader?.reset(); } catch(e) {}
-        codeReader = null;
-        const vid = document.getElementById('video');
-        try { if (vid.srcObject) { vid.srcObject.getTracks().forEach(t => t.stop()); vid.srcObject = null; } } catch(e) {}
-        scanning = false;
-        document.getElementById('scannerSection').classList.remove('show');
-        document.getElementById('scanBtn').classList.remove('active');
-        document.getElementById('scanBtnIcon').textContent = '📷';
-        document.getElementById('scanBtnText').textContent = '카메라로 바코드 스캔';
-        setScanStatus('바코드를 프레임 안에 맞춰 주세요', false);
-    }
+    // 4. 스캔 버튼 연결
+    document.getElementById('scanBtn').addEventListener('click', () => {
+        const section = document.getElementById('scannerSection');
+        if (!scanning) {
+            scanning = true;
+            section.classList.add('show');
+            document.getElementById('scanBtn').classList.add('active');
+            document.getElementById('scanBtnIcon').textContent = '⏹';
+            document.getElementById('scanBtnText').textContent = '스캔 중단';
+            setScanStatus('바코드를 프레임 안에 맞춰 주세요', false);
+            startScanner();
+        } else {
+            scanning = false;
+            try { reader.reset(); } catch(e) {}
+            const vid = document.getElementById('video');
+            try { if (vid.srcObject) { vid.srcObject.getTracks().forEach(t => t.stop()); vid.srcObject = null; } } catch(e) {}
+            section.classList.remove('show');
+            document.getElementById('scanBtn').classList.remove('active');
+            document.getElementById('scanBtnIcon').textContent = '📷';
+            document.getElementById('scanBtnText').textContent = '카메라로 바코드 스캔';
+            setScanStatus('바코드를 프레임 안에 맞춰 주세요', false);
+        }
+    });
 
     function setScanStatus(msg, ok) {
         const el = document.getElementById('scanStatus');
