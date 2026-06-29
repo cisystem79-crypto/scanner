@@ -67,9 +67,32 @@
         .br{bottom:-2px;right:-2px;border-bottom:3px solid #ff6d00;border-right:3px solid #ff6d00;border-radius:0 0 4px 0}
         #scanStatus { position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); color:#fff; font-size:13px; text-align:center; padding:8px; }
         #scanStatus.ok { color:#69f0ae; }
+
+        /* 팝업 */
+        #detailPopup { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999; align-items:center; justify-content:center; }
+        #detailPopup.show { display:flex; }
+        .popup-box { background:#fff; border-radius:16px; padding:24px; width:300px; box-shadow:0 8px 32px rgba(0,0,0,0.2); }
+        .popup-title { font-size:16px; font-weight:700; color:#1a73e8; margin-bottom:16px; text-align:center; }
+        .popup-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f1f3f4; font-size:13px; }
+        .popup-row:last-of-type { border-bottom:none; }
+        .popup-label { color:#9aa0a6; font-weight:500; }
+        .popup-value { color:#202124; font-weight:600; text-align:right; }
+        .popup-close { width:100%; margin-top:16px; padding:10px; background:#1a73e8; color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; }
     </style>
 </head>
 <body>
+
+<!-- 상세 팝업 -->
+<div id="detailPopup">
+    <div class="popup-box">
+        <div class="popup-title">📋 시리얼 상세 정보</div>
+        <div class="popup-row"><span class="popup-label">시리얼 번호</span><span class="popup-value" id="popSerial">-</span></div>
+        <div class="popup-row"><span class="popup-label">등록 일시</span><span class="popup-value" id="popRegDate">-</span></div>
+        <div class="popup-row"><span class="popup-label">사용 상태</span><span class="popup-value" id="popStatus">-</span></div>
+        <div class="popup-row"><span class="popup-label">사용 일시</span><span class="popup-value" id="popUsedDate">-</span></div>
+        <button class="popup-close" onclick="closePopup()">닫기</button>
+    </div>
+</div>
 
 <div id="loginScreen">
     <div class="login-box">
@@ -262,8 +285,10 @@
             const idx=serialList.indexOf(item);
             const li=document.createElement('li');
             if(item.used) li.className='used';
-            li.innerHTML=`<span class="serial-text">${item.serial}</span>
+            li.innerHTML=`
+                <span class="serial-text">${item.serial}</span>
                 <div class="action-btns">
+                    <button class="check-btn" onclick="showDetail(${idx})">자세히</button>
                     <button class="check-btn" onclick="toggleUsed(${idx})">${item.used?'✓ 완료':'사용하기'}</button>
                     <button class="delete-btn" onclick="deleteSerial(${idx})">지우기</button>
                 </div>`;
@@ -280,7 +305,7 @@
             if(navigator.vibrate) navigator.vibrate([200,100,200]);
             document.getElementById('serialInput').value='';
         }
-        else{ serialList.push({serial:val,used:false}); save(); showMsg(`✅ [완료] '${val}' 등록되었습니다.`,'success'); input.value=''; updateUI(); }
+        else{ serialList.push({serial:val,used:false,regDate:new Date().toLocaleString('ko-KR'),usedDate:''}); save(); showMsg(`✅ [완료] '${val}' 등록되었습니다.`,'success'); input.value=''; updateUI(); }
     }
 
     function bulkSave(){
@@ -297,8 +322,26 @@
         sortMode = mode;
         updateUI();
     }
+    function showDetail(i){
+        const item = serialList[i];
+        document.getElementById('popSerial').textContent = item.serial;
+        document.getElementById('popRegDate').textContent = item.regDate || '-';
+        document.getElementById('popStatus').textContent = item.used ? '✅ 사용 완료' : '⬜ 미사용';
+        document.getElementById('popUsedDate').textContent = item.usedDate || '-';
+        document.getElementById('detailPopup').classList.add('show');
+    }
+    function closePopup(){
+        document.getElementById('detailPopup').classList.remove('show');
+    }
+    // 팝업 바깥 클릭시 닫기
+    document.getElementById('detailPopup').addEventListener('click', function(e){ if(e.target===this) closePopup(); });
+
     function save(){ try{ localStorage.setItem('printer_serials_v2',JSON.stringify(serialList)); }catch(e){} }
-    function toggleUsed(i){ serialList[i].used=!serialList[i].used; save(); updateUI(); }
+    function toggleUsed(i){
+        serialList[i].used=!serialList[i].used;
+        serialList[i].usedDate = serialList[i].used ? new Date().toLocaleString('ko-KR') : '';
+        save(); updateUI();
+    }
     function deleteSerial(i){ if(confirm('삭제하시겠습니까?')){ serialList.splice(i,1); save(); updateUI(); } }
 
     function showMsg(text,type){
@@ -309,8 +352,8 @@
 
     function downloadCSV(){
         if(!serialList.length){ alert('백업할 데이터가 없습니다.'); return; }
-        let csv='\uFEFF순번,프린터 시리얼 번호,사용 여부\n';
-        serialList.forEach((item,i)=>{ csv+=`${i+1},${item.serial},${item.used?'사용 완료':'미사용'}\n`; });
+        let csv='\uFEFF순번,프린터 시리얼 번호,사용 여부,등록일,사용일\n';
+        serialList.forEach((item,i)=>{ csv+=`${i+1},${item.serial},${item.used?'사용 완료':'미사용'},${item.regDate||''},${item.usedDate||''}\n`; });
         const a=document.createElement('a');
         a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
         a.download='printer_backup.csv';
