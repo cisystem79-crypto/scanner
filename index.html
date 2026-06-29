@@ -264,7 +264,10 @@
         const input=document.getElementById('serialInput');
         const val=input.value.trim().toUpperCase();
         if(!val){ if(!auto) showMsg('⚠️ 시리얼 번호를 입력해 주세요.','error'); return; }
-        if(serialList.some(i=>i.serial===val)){ showMsg(`❌ [중복] 이미 등록된 번호입니다! (${val})`,'error'); }
+        if(serialList.some(i=>i.serial===val)){
+            showMsg(`❌ [중복] 이미 등록된 번호입니다! (${val})`,'error');
+            if(navigator.vibrate) navigator.vibrate([200,100,200]);
+        }
         else{ serialList.push({serial:val,used:false}); save(); showMsg(`✅ [완료] '${val}' 등록되었습니다.`,'success'); input.value=''; updateUI(); }
     }
 
