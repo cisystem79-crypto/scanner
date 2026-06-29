@@ -352,30 +352,44 @@
         updateUI();
     }
     function printList(){
-        const tbody = document.getElementById('printBody');
-        document.getElementById('printDate').textContent = new Date().toLocaleString('ko-KR');
-        document.getElementById('printTotal').textContent = serialList.length;
-        tbody.innerHTML = '';
         let sorted = [...serialList];
         if(sortMode==='asc') sorted.sort((a,b)=>a.serial.localeCompare(b.serial));
         else if(sortMode==='desc') sorted.sort((a,b)=>b.serial.localeCompare(a.serial));
         else sorted.reverse();
-        sorted.forEach((item,i)=>{
-            const tr = document.createElement('tr');
-            tr.style.background = i%2===0 ? '#fff' : '#f8f9fa';
-            tr.innerHTML = `
+
+        const rows = sorted.map((item,i)=>`
+            <tr style="background:${i%2===0?'#fff':'#f8f9fa'}">
                 <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;">${i+1}</td>
                 <td style="padding:6px 8px;border:1px solid #ddd;font-family:monospace;font-weight:600;">${item.serial}</td>
                 <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;">${item.used?'✅ 사용완료':'⬜ 미사용'}</td>
                 <td style="padding:6px 8px;border:1px solid #ddd;">${item.regDate||'-'}</td>
-                <td style="padding:6px 8px;border:1px solid #ddd;">${item.usedDate||'-'}</td>`;
-            tbody.appendChild(tr);
-        });
-        document.getElementById('printArea').style.display = 'block';
-        setTimeout(()=>{
-            window.print();
-            document.getElementById('printArea').style.display = 'none';
-        }, 300);
+                <td style="padding:6px 8px;border:1px solid #ddd;">${item.usedDate||'-'}</td>
+            </tr>`).join('');
+
+        const printWin = window.open('', '_blank');
+        printWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+        <title>프린터 시리얼 목록</title>
+        <style>
+            body { font-family: -apple-system, sans-serif; padding: 20px; color: #333; }
+            h2 { color: #1a73e8; text-align: center; margin-bottom: 4px; }
+            p { text-align: center; color: #666; font-size: 13px; margin: 4px 0 16px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { background: #1a73e8; color: #fff; padding: 8px; border: 1px solid #ddd; }
+            td { padding: 6px 8px; border: 1px solid #ddd; }
+            .footer { font-size: 11px; color: #999; text-align: right; margin-top: 12px; }
+        </style></head><body>
+        <h2>프린터 시리얼 관리 목록</h2>
+        <p>인쇄일시: ${new Date().toLocaleString('ko-KR')}</p>
+        <table>
+            <thead><tr>
+                <th>번호</th><th>시리얼 번호</th><th>상태</th><th>등록 일시</th><th>사용 일시</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <div class="footer">총 ${serialList.length}대</div>
+        <script>window.onload=()=>{window.print();}<\/script>
+        </body></html>`);
+        printWin.document.close();
     }
 
     function showDetail(i){
