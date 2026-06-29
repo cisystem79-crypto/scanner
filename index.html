@@ -119,7 +119,7 @@
     </button>
 
     <div id="scannerSection">
-        <div id="video" style="width:100%; aspect-ratio:4/3; position:relative; overflow:hidden;"></div>
+        <video id="video" autoplay muted playsinline style="width:100%; aspect-ratio:4/3; object-fit:cover; display:block;"></video>
         <div id="scanOverlay">
             <div class="scan-frame">
                 <div class="scan-line"></div>
@@ -152,7 +152,7 @@
 </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+
 <script>
     /* ── 로그인 ── */
     const USERS = { 'seeeye': '5864' };
@@ -198,59 +198,77 @@
     }
 
     /* ── 스캔 ── */
-    let scanning = false;
+    let scanning = false, stream = null, scanTimer = null;
     let lastVal = '', lastTs = 0;
+    let detector = null;
 
     document.getElementById('scanBtn').addEventListener('click', () => scanning ? stopScan() : startScan());
 
-    function startScan() {
+    async function startScan() {
         setScanStatus('카메라 시작 중...', false);
-        Quagga.init({
-            inputStream: {
-                name: 'Live',
-                type: 'LiveStream',
-                target: document.getElementById('video'),
-                constraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-            },
-            decoder: {
-                readers: ['code_39_reader', 'code_128_reader', 'ean_reader', 'ean_8_reader', 'upc_reader', 'codabar_reader', 'i2of5_reader']
-            },
-            locate: true,
-            numOfWorkers: 2,
-            frequency: 10
-        }, function(err) {
-            if (err) {
-                const msg = (err.name === 'NotAllowedError' || String(err).includes('Permission'))
-                    ? '❌ 카메라 권한이 거부됐습니다. 브라우저 설정에서 허용해 주세요.'
-                    : '❌ 카메라 오류: ' + (err.message || err);
-                showMsg(msg, 'error');
-                return;
+        try {
+            // BarcodeDetector API (크롬 안드로이드 지원)
+            if ('BarcodeDetector' in window) {
+                detector = new BarcodeDetector({ formats: ['code_39', 'code_128', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'data_matrix', 'codabar', 'itf'] });
             }
-            Quagga.start();
+
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+
+            const video = document.getElementById('video');
+            video.srcObject = stream;
+            await video.play();
+
             document.getElementById('scannerSection').classList.add('show');
             scanning = true;
             document.getElementById('scanBtn').classList.add('active');
             document.getElementById('scanBtnIcon').textContent = '⏹';
             document.getElementById('scanBtnText').textContent = '스캔 중단';
             setScanStatus('바코드를 프레임 안에 맞춰 주세요', false);
-        });
 
-        Quagga.onDetected(function(data) {
-            const now = Date.now();
-            const val = data.codeResult.code.trim().toUpperCase().replace(/\*/g, '');
-            if (val === lastVal && now - lastTs < 2500) return;
-            lastVal = val; lastTs = now;
-            document.getElementById('serialInput').value = val;
-            setScanStatus('✅ 스캔 완료: ' + val, true);
-            if (navigator.vibrate) navigator.vibrate([60, 30, 60]);
-            checkAndSave(true);
-            setTimeout(() => { if (scanning) setScanStatus('바코드를 프레임 안에 맞춰 주세요', false); }, 2000);
-        });
+            if (detector) {
+                scanLoop();
+            } else {
+                setScanStatus('❌ 이 브라우저는 바코드 인식을 지원하지 않습니다. 크롬을 사용해 주세요.', false);
+            }
+        } catch(e) {
+            const msg = e.name === 'NotAllowedError'
+                ? '❌ 카메라 권한이 거부됐습니다. 브라우저 설정에서 허용해 주세요.'
+                : '❌ 카메라 오류: ' + (e.message || e);
+            showMsg(msg, 'error');
+        }
+    }
+
+    async function scanLoop() {
+        if (!scanning) return;
+        const video = document.getElementById('video');
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            try {
+                const barcodes = await detector.detect(video);
+                if (barcodes.length > 0) {
+                    const now = Date.now();
+                    const val = barcodes[0].rawValue.trim().toUpperCase().replace(/\*/g, '');
+                    if (val && (val !== lastVal || now - lastTs > 2500)) {
+                        lastVal = val; lastTs = now;
+                        document.getElementById('serialInput').value = val;
+                        setScanStatus('✅ 스캔 완료: ' + val, true);
+                        if (navigator.vibrate) navigator.vibrate([60, 30, 60]);
+                        checkAndSave(true);
+                        setTimeout(() => { if (scanning) setScanStatus('바코드를 프레임 안에 맞춰 주세요', false); }, 2000);
+                    }
+                }
+            } catch(e) {}
+        }
+        scanTimer = setTimeout(scanLoop, 200);
     }
 
     function stopScan() {
-        try { Quagga.stop(); } catch(e) {}
         scanning = false;
+        if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+        const vid = document.getElementById('video');
+        vid.srcObject = null;
         document.getElementById('scannerSection').classList.remove('show');
         document.getElementById('scanBtn').classList.remove('active');
         document.getElementById('scanBtnIcon').textContent = '📷';
