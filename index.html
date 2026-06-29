@@ -176,37 +176,26 @@
     async function startScan() {
         setScanStatus('카메라 시작 중...', false);
         try {
-            // @zxing/browser 방식 (최신)
-            const ZXingBr = window.ZXingBrowser;
-            const ZXingLib = window.ZXing;
+            const ZXing = window.ZXing;
+            if (!ZXing) { showMsg('❌ 라이브러리 로딩 실패. 페이지를 새로고침 해주세요.', 'error'); return; }
 
-            let reader;
-            if (ZXingBr && ZXingBr.BrowserMultiFormatReader) {
-                reader = new ZXingBr.BrowserMultiFormatReader();
-            } else if (ZXingLib && ZXingLib.BrowserMultiFormatReader) {
-                reader = new ZXingLib.BrowserMultiFormatReader();
-            } else {
-                showMsg('❌ 라이브러리 로딩 실패. 페이지를 새로고침 해주세요.', 'error');
-                return;
-            }
+            // Code 39 최적화: 포맷 지정 + TRY_HARDER
+            const hints = new Map();
+            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.CODE_39]);
+            hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 
-            codeReader = reader;
-            const video = document.getElementById('video');
+            codeReader = new ZXing.BrowserMultiFormatReader(hints);
 
             // 후면 카메라 찾기
             const devices = await navigator.mediaDevices.enumerateDevices();
             const cams = devices.filter(d => d.kind === 'videoinput');
             const back = cams.find(d => /back|rear|environment/i.test(d.label)) || cams[cams.length - 1];
 
-            if (ZXingBr && ZXingBr.BrowserMultiFormatReader) {
-                const controls = await reader.decodeFromVideoDevice(back?.deviceId, video, (result, err) => {
-                    if (result) onDetected(result.getText());
-                });
-            } else {
-                await reader.decodeFromVideoDevice(back?.deviceId, video, (result, err) => {
-                    if (result) onDetected(result.getText());
-                });
-            }
+            const video = document.getElementById('video');
+            await codeReader.decodeFromVideoDevice(back?.deviceId, video, (result, err) => {
+                if (result) onDetected(result.getText());
+                if (err && !(err instanceof ZXing.NotFoundException)) console.error(err);
+            });
 
             document.getElementById('scannerSection').classList.add('show');
             scanning = true;
