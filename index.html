@@ -194,12 +194,12 @@
     async function startScanner() {
         setScanStatus('카메라 시작 중...', false);
         try {
-            // HD 해상도로 후면 카메라 직접 열기
+            // 고해상도(1920x1080)로 후면 카메라 직접 열기
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: { ideal: 'environment' },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
+                    facingMode: 'environment',
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
                 }
             });
 
