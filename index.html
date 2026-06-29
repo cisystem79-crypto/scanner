@@ -318,7 +318,7 @@
                 <span class="serial-text">${item.serial}</span>
                 <div class="action-btns">
                     <button class="check-btn" onclick="showDetail(${idx})">자세히</button>
-                    <button class="check-btn" onclick="toggleUsed(${idx})">${item.used?'✓ 완료':'사용하기'}</button>
+                    <button class="check-btn" onclick="toggleUsed(${idx})">${item.used?'✓ 완료':'센터제출일'}</button>
                     <button class="delete-btn" onclick="deleteSerial(${idx})">지우기</button>
                 </div>`;
             el.appendChild(li);
@@ -361,7 +361,7 @@
             <tr style="background:${i%2===0?'#fff':'#f8f9fa'}">
                 <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;">${i+1}</td>
                 <td style="padding:6px 8px;border:1px solid #ddd;font-family:monospace;font-weight:600;">${item.serial}</td>
-                <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;">${item.used?'✅ 사용완료':'⬜ 미사용'}</td>
+                <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;">${item.used?'✅ 센터제출':'⬜ 미제출'}</td>
                 <td style="padding:6px 8px;border:1px solid #ddd;">${item.regDate||'-'}</td>
                 <td style="padding:6px 8px;border:1px solid #ddd;">${item.usedDate||'-'}</td>
             </tr>`).join('');
@@ -396,7 +396,7 @@
         const item = serialList[i];
         document.getElementById('popSerial').textContent = item.serial;
         document.getElementById('popRegDate').textContent = item.regDate || '-';
-        document.getElementById('popStatus').textContent = item.used ? '✅ 사용 완료' : '⬜ 미사용';
+        document.getElementById('popStatus').textContent = item.used ? '✅ 센터제출 완료' : '⬜ 미제출';
         document.getElementById('popUsedDate').textContent = item.usedDate || '-';
         document.getElementById('detailPopup').classList.add('show');
     }
