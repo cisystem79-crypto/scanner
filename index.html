@@ -68,6 +68,13 @@
         #scanStatus { position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); color:#fff; font-size:13px; text-align:center; padding:8px; }
         #scanStatus.ok { color:#69f0ae; }
 
+        /* 인쇄 */
+        @media print {
+            body * { visibility: hidden; }
+            #printArea, #printArea * { visibility: visible; }
+            #printArea { position:fixed; inset:0; background:#fff; padding:20px; }
+        }
+
         /* 팝업 */
         #detailPopup { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999; align-items:center; justify-content:center; }
         #detailPopup.show { display:flex; }
@@ -155,6 +162,28 @@
     </div>
     <ul id="serialList"></ul>
     <button class="btn btn-success" id="backupBtn">📊 엑셀(CSV) 파일로 백업받기</button>
+    <button class="btn" style="background:#5f6368;width:100%;margin-top:8px;padding:12px;" onclick="printList()">🖨️ 목록 인쇄하기</button>
+
+    <!-- 인쇄 영역 -->
+    <div id="printArea" style="display:none;">
+        <div style="text-align:center;margin-bottom:16px;">
+            <h2 style="color:#1a73e8;margin:0;">프린터 시리얼 관리 목록</h2>
+            <p style="color:#666;font-size:13px;margin:4px 0 0;">인쇄일시: <span id="printDate"></span></p>
+        </div>
+        <table id="printTable" style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+                <tr style="background:#1a73e8;color:#fff;">
+                    <th style="padding:8px;border:1px solid #ddd;text-align:center;">번호</th>
+                    <th style="padding:8px;border:1px solid #ddd;">시리얼 번호</th>
+                    <th style="padding:8px;border:1px solid #ddd;text-align:center;">상태</th>
+                    <th style="padding:8px;border:1px solid #ddd;">등록 일시</th>
+                    <th style="padding:8px;border:1px solid #ddd;">사용 일시</th>
+                </tr>
+            </thead>
+            <tbody id="printBody"></tbody>
+        </table>
+        <p style="font-size:11px;color:#999;margin-top:12px;text-align:right;">총 <span id="printTotal"></span>대</p>
+    </div>
 </div>
 </div>
 
@@ -322,6 +351,33 @@
         sortMode = mode;
         updateUI();
     }
+    function printList(){
+        const tbody = document.getElementById('printBody');
+        document.getElementById('printDate').textContent = new Date().toLocaleString('ko-KR');
+        document.getElementById('printTotal').textContent = serialList.length;
+        tbody.innerHTML = '';
+        let sorted = [...serialList];
+        if(sortMode==='asc') sorted.sort((a,b)=>a.serial.localeCompare(b.serial));
+        else if(sortMode==='desc') sorted.sort((a,b)=>b.serial.localeCompare(a.serial));
+        else sorted.reverse();
+        sorted.forEach((item,i)=>{
+            const tr = document.createElement('tr');
+            tr.style.background = i%2===0 ? '#fff' : '#f8f9fa';
+            tr.innerHTML = `
+                <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;">${i+1}</td>
+                <td style="padding:6px 8px;border:1px solid #ddd;font-family:monospace;font-weight:600;">${item.serial}</td>
+                <td style="padding:6px 8px;border:1px solid #ddd;text-align:center;">${item.used?'✅ 사용완료':'⬜ 미사용'}</td>
+                <td style="padding:6px 8px;border:1px solid #ddd;">${item.regDate||'-'}</td>
+                <td style="padding:6px 8px;border:1px solid #ddd;">${item.usedDate||'-'}</td>`;
+            tbody.appendChild(tr);
+        });
+        document.getElementById('printArea').style.display = 'block';
+        setTimeout(()=>{
+            window.print();
+            document.getElementById('printArea').style.display = 'none';
+        }, 300);
+    }
+
     function showDetail(i){
         const item = serialList[i];
         document.getElementById('popSerial').textContent = item.serial;
