@@ -152,7 +152,7 @@
 </div>
 </div>
 
-<script src="zxing.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
 <script>
     /* ── 로그인 ── */
     const USERS = { 'seeeye': '5864' };
@@ -205,27 +205,29 @@
 
     async function startScan() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-            });
-            const video = document.getElementById('video');
-            video.srcObject = stream;
-            await video.play();
-
             const ZXing = window.ZXingBrowser || window.ZXing;
-            if (ZXing) {
-                codeReader = new ZXing.BrowserMultiFormatReader();
-                codeReader.decodeFromStream(stream, video, onDecode);
-            }
+            if (!ZXing) { showMsg('❌ 라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.', 'error'); return; }
+
+            codeReader = new ZXing.BrowserMultiFormatReader();
+
+            // 후면 카메라 deviceId 직접 탐색
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            const back = videoDevices.find(d => /back|rear|environment/i.test(d.label));
+            const deviceId = back ? back.deviceId : (videoDevices[videoDevices.length - 1]?.deviceId);
+
+            const video = document.getElementById('video');
+            await codeReader.decodeFromVideoDevice(deviceId || undefined, video, onDecode);
 
             document.getElementById('scannerSection').classList.add('show');
             scanning = true;
             document.getElementById('scanBtn').classList.add('active');
             document.getElementById('scanBtnIcon').textContent = '⏹';
             document.getElementById('scanBtnText').textContent = '스캔 중단';
+            setScanStatus('바코드를 프레임 안에 맞춰 주세요', false);
         } catch(e) {
             const msg = e.name === 'NotAllowedError'
-                ? '❌ 카메라 권한이 거부됐습니다. 앱 설정에서 허용해 주세요.'
+                ? '❌ 카메라 권한이 거부됐습니다. 브라우저 설정에서 허용해 주세요.'
                 : '❌ 카메라 오류: ' + (e.message || e);
             showMsg(msg, 'error');
         }
@@ -248,7 +250,7 @@
         try { codeReader?.reset(); } catch(e) {}
         codeReader = null;
         const vid = document.getElementById('video');
-        if (vid.srcObject) { vid.srcObject.getTracks().forEach(t => t.stop()); vid.srcObject = null; }
+        try { if (vid.srcObject) { vid.srcObject.getTracks().forEach(t => t.stop()); vid.srcObject = null; } } catch(e) {}
         scanning = false;
         document.getElementById('scannerSection').classList.remove('show');
         document.getElementById('scanBtn').classList.remove('active');
