@@ -94,10 +94,14 @@
     <div class="popup-box">
         <div class="popup-title">📋 시리얼 상세 정보</div>
         <div class="popup-row"><span class="popup-label">시리얼 번호</span><span class="popup-value" id="popSerial">-</span></div>
-        <div class="popup-row"><span class="popup-label">등록 일시</span><span class="popup-value" id="popRegDate">-</span></div>
-        <div class="popup-row"><span class="popup-label">사용 상태</span><span class="popup-value" id="popStatus">-</span></div>
-        <div class="popup-row"><span class="popup-label">사용 일시</span><span class="popup-value" id="popUsedDate">-</span></div>
-        <button class="popup-close" onclick="closePopup()">닫기</button>
+        <div class="popup-row"><span class="popup-label">바코드등록일시</span><span class="popup-value" id="popRegDate">-</span></div>
+        <div class="popup-row"><span class="popup-label">센터제출 상태</span><span class="popup-value" id="popStatus">-</span></div>
+        <div style="padding:10px 0 4px;">
+            <label style="font-size:12px;color:#9aa0a6;font-weight:600;display:block;margin-bottom:6px;">센터제출일 수정</label>
+            <input type="datetime-local" id="popUsedDateInput" style="width:100%;padding:10px;border:1px solid #dadce0;border-radius:8px;font-size:14px;">
+        </div>
+        <button class="popup-close" onclick="saveDetailDate()" style="background:#34a853;">📅 제출일 저장</button>
+        <button class="popup-close" onclick="closePopup()" style="background:#5f6368;margin-top:8px;">닫기</button>
     </div>
 </div>
 
@@ -392,16 +396,38 @@
         printWin.document.close();
     }
 
+    let popupIdx = null;
+    function toDatetimeLocal(str){
+        // "사용일시" 문자열 또는 빈값을 datetime-local input 형식으로 변환 시도
+        if(!str) return '';
+        const d = new Date(str);
+        if(isNaN(d.getTime())) return '';
+        const pad = n => String(n).padStart(2,'0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
     function showDetail(i){
+        popupIdx = i;
         const item = serialList[i];
         document.getElementById('popSerial').textContent = item.serial;
         document.getElementById('popRegDate').textContent = item.regDate || '-';
         document.getElementById('popStatus').textContent = item.used ? '✅ 센터제출 완료' : '⬜ 미제출';
-        document.getElementById('popUsedDate').textContent = item.usedDate || '-';
+        document.getElementById('popUsedDateInput').value = toDatetimeLocal(item.usedDate);
         document.getElementById('detailPopup').classList.add('show');
+    }
+    function saveDetailDate(){
+        if(popupIdx===null) return;
+        const inputVal = document.getElementById('popUsedDateInput').value; // "2026-06-30T15:25"
+        if(!inputVal){ showMsg('⚠️ 날짜/시간을 선택해 주세요.','error'); return; }
+        const d = new Date(inputVal);
+        serialList[popupIdx].usedDate = d.toLocaleString('ko-KR');
+        serialList[popupIdx].used = true; // 날짜를 지정하면 자동으로 제출완료 처리
+        save(); updateUI();
+        showMsg(`✅ '${serialList[popupIdx].serial}' 센터제출일이 저장되었습니다.`,'success');
+        closePopup();
     }
     function closePopup(){
         document.getElementById('detailPopup').classList.remove('show');
+        popupIdx = null;
     }
     // 팝업 바깥 클릭시 닫기
     document.getElementById('detailPopup').addEventListener('click', function(e){ if(e.target===this) closePopup(); });
