@@ -417,6 +417,7 @@
     function showMsg(text,type){
         const el=document.getElementById('messageBox');
         el.innerText=text; el.className=`msg ${type}`;
+        el.style.display='block';
         setTimeout(()=>{ if(el.innerText===text) el.style.display='none'; },4000);
     }
 
