@@ -318,7 +318,7 @@
                 <span class="serial-text">${item.serial}</span>
                 <div class="action-btns">
                     <button class="check-btn" onclick="showDetail(${idx})">자세히</button>
-                    <button class="check-btn" onclick="toggleUsed(${idx})">${item.used?'✓ 완료':'센터제출일'}</button>
+                    <button class="check-btn" onclick="toggleUsed(${idx})">${item.used?'✓ 완료':'센터제출하기'}</button>
                     <button class="delete-btn" onclick="deleteSerial(${idx})">지우기</button>
                 </div>`;
             el.appendChild(li);
@@ -382,7 +382,7 @@
         <p>인쇄일시: ${new Date().toLocaleString('ko-KR')}</p>
         <table>
             <thead><tr>
-                <th>번호</th><th>시리얼 번호</th><th>상태</th><th>등록 일시</th><th>사용 일시</th>
+                <th>번호</th><th>시리얼 번호</th><th>상태</th><th>등록 일시</th><th>센터제출일</th>
             </tr></thead>
             <tbody>${rows}</tbody>
         </table>
